@@ -1,0 +1,39 @@
+
+Design Idea
+
+Main.py = Gui display of the database
+
+Option one shows every entry in the table with its values
+
+Option two shows only a preview like first, last name or the like
+
+Valeus should be listed as labels, if they link to another table they should be buttons
+
+Inside the current view if not in the main table should give the option to go back to the previous
+
+Conf.py = gui for filling and editing the database
+
+Created, edit and delete options
+
+Created: Allow the user to created tables and fill them with values.
+
+         The create table should have a button to add or remove the current row or a button in the row to delete
+         then in the  row the datatyp should be defined and if they are a primary or forgine key
+
+         in the proccess of filling them the rows should show what is expected and if rows are not filled
+         or falsy filled give an error, to avoid breaking add a default value to be added
+
+edit: will list all created tables and allow editing them and its values inside
+
+         If the table is eddited and a row is remove then that row will be delete for every entry
+         if a typ is changed change the typ if not possible throw error for admin fix or default value
+         chaning entry values should be easy enough to expalin as it follows the strutcture
+
+delete: Deletes the table and its entrys or just a entry
+
+
+Update.py = is called by conf to update the database live| needs testing if it works like intended
+
+
+
+Best to begin with the conf file to auto fill the gui
