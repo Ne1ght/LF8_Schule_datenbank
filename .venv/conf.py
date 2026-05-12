@@ -1,3 +1,4 @@
+import sys
 from tkinter import *
 from tkinter import messagebox
 
@@ -28,50 +29,69 @@ class conf():
         self.created_button = Button(self.conf_frame,
                                      text="Created",
                                      font=("Arial", 20),
-                                     command=self.select_option
+                                     command=lambda: self.select_option("Created")
                                      )
         self.created_button.grid(row=1, column=0)
 
         self.edit_button = Button(self.conf_frame,
                                   text="Edit",
-                                  font=("Arial", 20)
+                                  font=("Arial", 20),
+                                  command=lambda: self.select_option("Edit")
                                   )
         self.edit_button.grid(row=1, column=2)
 
         self.delete_button = Button(self.conf_frame,
                                     text="Delete",
-                                    font=("Arial", 20)
+                                    font=("Arial", 20),
+                                    command=lambda: self.select_option("Delete")
                                     )
         self.delete_button.grid(row=2, column=0)
 
-    def select_option(self):
+    def select_option(self, operation_type):
+
+        if operation_type == "Creatred":
+            operation = "Created"
+            state = "new"
+        elif operation_type == "Edit":
+            operation = "Edit"
+            state= "existing"
+        else:
+            operation = "Delete"
+            state = "existing"
+
         self.dialog = Toplevel(self.confroot)
         self.dialog_label = Label(self.dialog,
-                                  text="Do you want to created a new Table or new Entry in a Table?",
+                                  text=f"Do you want to {operation} a {state} Table or {state} Entry in a Table?",
                                   font=("Arial", 12),
                                   )
         self.dialog_label.grid(row=0, columnspan=5)
 
         self.New_Table_Button = Button(self.dialog,
-                                       text="New Table",
+                                       text=f"{state} Table",
                                        font=("Arial", 12),
-                                       command=self.selected_table
+                                       command=lambda: self.selected_table(operation_type)
                                        )
         self.New_Table_Button.grid(row=1, column=1)
 
         self.New_Entry_Button = Button(self.dialog,
-                                       text="New Entry",
+                                       text=f"{state} Entry",
                                        font=("Arial", 12),
-                                       command=self.selected_entry
+                                       command=lambda: self.selected_entry(operation_type)
                                        )
         self.New_Entry_Button.grid(row=1, column=3)
 
-    def selected_table(self):
+    def selected_table(self, operation_type):
         self.dialog.destroy()
         self.conf_frame.forget()
-        Open_Created_Table = Created_Table(self.confroot)
 
-    def selected_entry(self):
+        if operation_type == "Created":
+            Open_Created_Table = Created_Table(self.confroot)
+        elif operation_type == "Edit":
+            pass
+        elif operation_type == "Delete":
+            open_Deleted_Table = Delete_Table(self.confroot)
+
+    def selected_entry(self, operation_type):
         self.dialog.destroy()
         self.conf_frame.forget()
         Created_Entry(roo)
@@ -88,6 +108,12 @@ class Created_Table():
 
         self.add_frame = Frame(self.confroot)
         self.add_frame.pack()
+
+        self.Menu_button = Button(self.Create_TFrame,
+                                  text="Go Back",
+                                  font=("Arial", 10),
+                                  command=self.go_back)
+        self.Menu_button.grid(row=0, column=0)
 
         self.label_name = Label(self.Create_TFrame,
                                 text="Table Name: ",
@@ -324,11 +350,14 @@ class Created_Table():
                 return
 
             if is_pk:
-                column_definitions[-1] += " Primary Key"
+                print(column_definitions)
+                # column_definitions[-1] += " Primary Key"
+                primary_keys.append(column_name)
 
 
             if is_fk:
-                column_definitions[-1] += " Foreign Key"
+                # column_definitions[-1] += " Foreign Key"
+                foreign_keys.append(column_name)
 
                 self.Foreign_Key_True()
 
@@ -337,25 +366,36 @@ class Created_Table():
 
         print(column_definitions)
 
+        if primary_keys:
+            pk_constraint = f"CONSTRAINT pk_{table_name} PRIMARY KEY ({', '.join(primary_keys)})"
+            column_definitions.append(pk_constraint)
 
+        print(column_definitions)
 
+        sql = f"CREATE TABLE {table_name} (\n"
+        sql += ",\n".join(f"     {col}" for col in column_definitions)
+        sql += "\n)"
 
+        print("\n" + "=" * 50)
+        print("Generated SQL:")
+        print("=" * 50)
+        print(sql)
+        print("=" * 50 + "\n")
 
-
-
+        self.execute_sql(sql, table_name)
 
 
     def Foreign_Key_True(self):
-        self.keylink = Toplevel(self.confroot)
+        self.ForKey = Toplevel(self.confroot)
 
-        self.keylink_frame = Frame(self.keylink)
-        self.keylink_frame.pack()
+        self.ForKey_frame = Frame(self.ForKey)
+        self.ForKey_frame.pack()
 
-        self.keylink_label = Label(self.keylink_frame,
+        self.ForKey_label = Label(self.ForKey_frame,
                                    text="Select a Table with a MATCHING Key",
                                    font=("arial", 12),
                                    fg="black")
-        self.keylink_label.pack()
+        self.ForKey_label.pack()
 
         query = """
         SELECT 
@@ -373,14 +413,18 @@ class Created_Table():
             user_constraints cons 
             ON cons_cols.constraint_name = cons.constraint_name 
             AND cons.constraint_type = 'P'
+        WHERE
+            
         ORDER BY 
             cols.table_name, 
             cons_cols.position
         """
 
-        cursor.execute(query)
+        cur.execute(query)
 
-        result = cursor.fetchall()
+        result = cur.fetchall()
+
+        pprint.pprint(result)
 
         if not result:
             pass
@@ -388,18 +432,122 @@ class Created_Table():
             pass
 
 
+    def execute_sql(self, sql, table_name):
+
+        try:
+            check_sql = """
+            SELECT COUNT(*)
+            FROM user_tables
+            WHERE UPPER(table_name) = UPPER(:table_name)
+            """
+            cur.execute(check_sql, {'table_name': table_name})
+            exists = cur.fetchone()[0]
+
+            if exists > 0:
+                self.status_label.config(text=f"Error: Table '{table_name}' already exists!", fg="red")
+
+                print(f"X Table '{table_name}' already exists in database!")
+                return
+            cur.execute(sql)
+
+            comment_sql = f"COMMENT ON TABLE {table_name} IS 'GUI_CREATED'"
+            cur.execute(comment_sql)
+
+            con.commit()
+
+            self.status_label.config(text=f"Table '{table_name}' created!", fg="green")
+            print(f"Y Table '{table_name}' created!\n")
+
+        except oracledb.DataError as e:
+            error_obj, = e.args
+            self.status_label.config(text=f"Error: {error_obj.message[:50]}", fg="red")
+            print(f"X Oracle Database Error: {error_obj.message}")
+
+        except Exception as e:
+            self.status_label.config(text=f"Error: {str(e)[:50]}...", fg="red")
+            print(f"X Error: {e}")
 
 
-
-
-
-
+    def go_back(self):
+        self.Create_TFrame.forget()
+        self.add_frame.forget()
+        conf(self.confroot)
 
 
 class Created_Entry():
     def __init__(self, root_window):
         self.confroot = root_window
 
+
+class Delete_Table:
+    def __init__(self, root_window):
+        self.confroot = root_window
+
+        self.delete_frame = Frame(self.confroot)
+        self.delete_frame.pack()
+
+        self.delete_label = Label(self.delete_frame,
+                                  text="Select a Table to delete",
+                                  font=("arial", 10),
+        )
+        self.delete_label.grid(row=1)
+
+        self.Menu_button = Button(self.delete_frame,
+                                  text="Go Back",
+                                  font=("Arial", 10),
+                                  command=self.go_back)
+        self.Menu_button.grid(row=0)
+
+        cur.execute("SELECT table_name FROM user_tab_comments WHERE comments = 'GUI_CREATED'")
+        self.table_name = cur.fetchall()
+
+        self.table_box = Listbox(self.delete_frame,
+                                 selectmode="multiple",
+                                 font=("Arial", 10),)
+        self.table_box.grid(row=2)
+
+        for entry in self.table_name:
+            self.table_box.insert(END, entry)
+
+        self.Drop_Button = Button(self.delete_frame,
+                                  text="Drop Table/Tables",
+                                  font=("Arial", 10),
+                                  command=self.drop_table_tables)
+        self.Drop_Button.grid(row=3)
+
+        self.status_label = Label(self.delete_frame,
+                                  text="",
+                                  font=("Arial", 10),
+                                  fg="red")
+        self.status_label.grid(row=4)
+
+    def drop_table_tables(self):
+        for name in self.table_box.curselection():
+            name = self.table_box.get(name)
+
+            n = name[0]
+
+            sql = f"DROP TABLE {n}"
+            cur.execute(sql)
+
+            self.status_label.config(text=f"Table '{n}' has been dropped!", fg="green")
+
+            self.update(n)
+
+    def update(self, n):
+
+        self.table_box.delete(0, END)
+
+        cur.execute("SELECT table_name FROM user_tab_comments WHERE comments = 'GUI_CREATED'")
+        self.table_name = cur.fetchall()
+
+        for entry in self.table_name:
+            self.table_box.insert(END, entry[0])
+
+
+    def go_back(self):
+        self.delete_frame.forget()
+        conf(self.confroot)
 
 if __name__ == "__main__":
     root_window = Tk()
