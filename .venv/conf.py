@@ -47,6 +47,49 @@ class conf():
                                     )
         self.delete_button.grid(row=2, column=0)
 
+        self.Test_DB = Button(self.conf_frame,
+                              text="Query Tables",
+                              font=("Arial", 20),
+                              command=self.Query_DB)
+        self.Test_DB.grid(row=3, column=0)
+
+    def Query_DB(self):
+
+        Query = """SELECT 
+                        cols.table_name,
+                        tab_comments.comments AS table_comment,
+                        cols.column_name,
+                        cols.data_type,
+                        cols.data_length,
+                        cols.data_precision,
+                        cols.data_scale,
+                        cons.constraint_type
+                    FROM 
+                        user_tab_columns cols
+                    LEFT JOIN
+                        user_cons_columns cons_cols 
+                        ON cols.table_name = cons_cols.table_name 
+                        AND cols.column_name = cons_cols.column_name
+                    LEFT JOIN
+                        user_constraints cons 
+                        ON cons_cols.constraint_name = cons.constraint_name 
+                        AND cons.constraint_type IN ('P', 'R')
+                    LEFT JOIN
+                        user_tab_comments tab_comments
+                        ON cols.table_name = tab_comments.table_name
+                    WHERE
+                        tab_comments.comments = 'GUI_CREATED'
+                    ORDER BY 
+                        cols.table_name, 
+                        cols.column_id
+                        """
+
+        cur.execute(Query)
+
+        result = cur.fetchall()
+
+        pprint.pprint(result)
+
     def select_option(self, operation_type):
 
         if operation_type == "Creatred":
@@ -357,9 +400,15 @@ class Created_Table():
 
             if is_fk:
                 # column_definitions[-1] += " Foreign Key"
-                foreign_keys.append(column_name)
 
-                self.Foreign_Key_True()
+                column_name = column_definitions[0].split()[0]
+                full_datatype = column_definitions[0].split()[1]
+                foreign_keys.append({
+                    "column_name": column_name,
+                    "datatype": full_datatype,
+                })
+
+
 
         if not column_definitions:
             self.status_label.config(text="Error: Check of table failed, not valid", fg="red")
@@ -372,6 +421,10 @@ class Created_Table():
 
         print(column_definitions)
 
+        self.pending_table_name = table_name
+        self.pending_column_definitions = column_definitions
+        self.pending_foreign_keys = foreign_keys
+
         sql = f"CREATE TABLE {table_name} (\n"
         sql += ",\n".join(f"     {col}" for col in column_definitions)
         sql += "\n)"
@@ -382,55 +435,301 @@ class Created_Table():
         print(sql)
         print("=" * 50 + "\n")
 
-        self.execute_sql(sql, table_name)
+        if foreign_keys:
+            self.Foreign_Key_True()
+        else:
+            self.execute_sql(sql, table_name)
 
 
     def Foreign_Key_True(self):
         self.ForKey = Toplevel(self.confroot)
+        self.ForKey.geometry("800x500")
 
-        self.ForKey_frame = Frame(self.ForKey)
-        self.ForKey_frame.pack()
+        #self.ForKey_frame = Frame(self.ForKey)
+        #self.ForKey_frame.pack()
 
+        """
         self.ForKey_label = Label(self.ForKey_frame,
                                    text="Select a Table with a MATCHING Key",
                                    font=("arial", 12),
                                    fg="black")
-        self.ForKey_label.pack()
+        self.ForKey_label.grid(row=0)
 
-        query = """
-        SELECT 
-            cols.table_name,
-            cols.column_name,
-            cols.data_type,
-            'PRIMARY KEY' as constraint_type
-        FROM 
-            user_tab_columns cols
-        INNER JOIN 
-            user_cons_columns cons_cols 
-            ON cols.table_name = cons_cols.table_name 
-            AND cols.column_name = cons_cols.column_name
-        INNER JOIN 
-            user_constraints cons 
-            ON cons_cols.constraint_name = cons.constraint_name 
-            AND cons.constraint_type = 'P'
-        WHERE
-            
-        ORDER BY 
-            cols.table_name, 
-            cons_cols.position
+        self.table_box_PriKey = Listbox(self.ForKey_frame,
+                                        selectmode=SINGLE,
+                                        font=("Arial", 10), )
+        self.table_box_PriKey.grid(row=1)
         """
 
-        cur.execute(query)
+        available_pks = self.get_tables_with_pk()
 
-        result = cur.fetchall()
+        pprint.pprint(available_pks)
 
-        pprint.pprint(result)
+        print(f"Peding forgine keys: {self.pending_foreign_keys}")
 
-        if not result:
-            pass
-        else:
-            pass
+        if not available_pks:
+            Label(self.ForKey,
+                  text="X No tables with Primary Keys found!\nCreate a table with a Primary Key first!",
+                  font=("Arial", 12),
+                  fg="red").pack(pady=20)
 
+            Button(self.ForKey,
+                   text="Cancel",
+                   font=("Arial", 12),
+                   command=self.ForKey_frame.destroy).pack(pady=10)
+            return
+
+        canvas = Canvas(self.ForKey)
+        scrollbar = Scrollbar(self.ForKey, orient=VERTICAL, command=canvas.yview)
+        scrollbar_frame = Frame(canvas)
+
+        scrollbar_frame.bind("<Configure>", lambda e: canvas.configure(scrollregion=canvas.bbox("all")))
+
+        canvas.create_window((0,0), window=scrollbar_frame, anchor=NW)
+        canvas.configure(yscrollcommand=scrollbar.set)
+
+        canvas.pack(side=LEFT, fill=BOTH, expand=True, padx=10, pady=10)
+        scrollbar.pack(side=RIGHT, fill=Y)
+
+        header_frame = Frame(scrollbar_frame, relief=RIDGE, borderwidth=2, bg="lightgray")
+        header_frame.pack(padx=5, pady=5)
+
+        Label(header_frame,
+              text="FK Column",
+              font=("Arial", 10, "bold"),
+              bg="lightgrey",
+              width=15
+              ).grid(row=0, column=0, padx=5, pady=5)
+        Label(header_frame,
+              text="FK Datatype",
+              font=("Arial", 10, "bold"),
+              bg="lightgrey",
+              width=15
+              ).grid(row=0, column=1, padx=5, pady=5)
+        Label(header_frame,
+              text="References Table",
+              font=("Arial", 10, "bold"),
+              bg="lightgrey",
+              width=20
+              ).grid(row=0, column=2, padx=5, pady=5)
+        Label(header_frame,
+              text="References Column",
+              font=("Arial", 10, "bold"),
+              bg="lightgrey",
+              width=25
+              ).grid(row=0, column=3, padx=5, pady=5)
+
+        self.fk_references = {}
+
+        for idx, fk in enumerate(self.pending_foreign_keys):
+            print(f"idx: {idx}")
+            print(f"fk: {fk}")
+            print(f"fk Column: {fk['column_name']}")
+            row_frame = Frame(scrollbar_frame, relief=GROOVE, borderwidth=1)
+            row_frame.pack(fill=X, padx=5, pady=2)
+
+            Label(row_frame,
+                  text=fk['column_name'],
+                  font=("Arial", 10),
+                  width=15
+                  ).grid(row=idx, column=0, padx=5, pady=5)
+
+            Label(row_frame,
+                  text=fk['datatype'],
+                  font=("Arial", 10),
+                  width=15,
+                  ).grid(row=0, column=1, padx=5, pady=5)
+
+            table_var = StringVar(value="-- Select Table --")
+            table_menu = OptionMenu(row_frame, table_var, *[pk["table_name"] for pk in available_pks])
+            table_menu.config(width=18)
+            table_menu.grid(row=0, column=2, padx=5, pady=5)
+
+            column_var = StringVar(value="-- Select Column --")
+            column_menu = OptionMenu(row_frame, column_var, "")
+            column_menu.config(width=23)
+            column_menu.grid(row=0, column=3, padx=5, pady=5)
+
+            self.fk_references[idx] = {
+                "fk_column": fk["column_name"],
+                "fk_datatype": fk["datatype"],
+                "table_var": table_var,
+                "column_var": column_var,
+                "column_menu": column_menu,
+                "available_pks": available_pks
+            }
+
+            table_var.trace("w", lambda *args, i=idx: self.update_fk_columns(i))
+
+        button_frame = Frame(scrollbar_frame)
+        button_frame.pack(pady=10)
+
+        Button(button_frame,
+               text="Create Table",
+               font=("Arial", 12, "bold"),
+               bg="green",
+               fg="white",
+               command=self.validate_and_create_table).pack(side=LEFT, pady=10)
+
+        Button(button_frame,
+               text="Cancel Creation",
+               font=("Arial", 12, "bold"),
+               bg="red",
+               fg="white",
+               command=self.ForKey.destroy).pack(side=LEFT, pady=10)
+
+    def get_tables_with_pk(self):
+        try:
+            query = """
+                    SELECT 
+                        cols.table_name,
+                        tab_comments.comments AS table_comment,
+                        cols.column_name,
+                        cols.data_type,
+                        cols.data_length,
+                        cols.data_precision,
+                        cols.data_scale,
+                        'PRIMARY KEY' as constraint_type
+                    FROM 
+                        user_tab_columns cols
+                    INNER JOIN 
+                        user_cons_columns cons_cols 
+                        ON cols.table_name = cons_cols.table_name 
+                        AND cols.column_name = cons_cols.column_name
+                    INNER JOIN 
+                        user_constraints cons 
+                        ON cons_cols.constraint_name = cons.constraint_name 
+                        AND cons.constraint_type = 'P'
+                    LEFT JOIN
+                    user_tab_comments tab_comments
+                    ON cols.table_name = tab_comments.table_name
+                    WHERE
+                        tab_comments.comments = 'GUI_CREATED'
+                    ORDER BY 
+                        cols.table_name, 
+                        cons_cols.position
+                    """
+
+            cur.execute(query)
+
+            result = cur.fetchall()
+
+            pprint.pprint(f"Result query: {result}")
+
+            tables = {}
+            for table in result:
+
+                table_name = table[0]
+                column_name = table[2]
+                datatype = table[3]
+                data_length = table[4]
+                data_precision = table[5]
+                data_scale = table[6]
+                column_key = table[7]
+
+                if datatype == "NUMBER":
+                    if data_precision and data_scale:
+                        full_type = f"NUMBER({data_precision},{data_scale})"
+                    elif data_precision:
+                        full_type = f"NUMBER({data_precision})"
+                    else:
+                        full_type = "NUMBER"
+                elif datatype in ["VARCHAR", "CHAR", "NVARCHAR2", "NCHAR"]:
+                    full_type = f"{datatype}({data_precision})"
+                else:
+                    full_type = datatype
+
+                if table_name not in tables:
+                    tables[table_name] = {
+                        "table_name": table_name,
+                        "pk_colums": []
+                    }
+
+                tables[table_name]["pk_colums"].append({
+                    "column_name": column_name,
+                    "datatype": full_type
+                })
+
+                pprint.pprint(f"Content in tables{tables}")
+            return list(tables.values())
+
+        except Exception as e:
+            print(f"Error fetching tables with PK: {e}")
+            return[]
+
+    def update_fk_columns(self, fk_idx):
+        ref = self.fk_references[fk_idx]
+        selected_table = ref["table_var"].get()
+
+        if selected_table == "-- Select Table --":
+            return
+
+        table_info = next(
+            (t for t in ref["available_pks"] if t ["table_name"] == selected_table),
+            None
+        )
+
+        if not table_info:
+            return
+
+        menu = ref["column_menu"]["menu"]
+        menu.delete(0, "end")
+
+        ref["column_var"].set("-- Select Column --")
+
+        for col in table_info["pk_colums"]:
+            display_text = f"{col['column_name']} ({col['datatype']})"
+            menu.add_command(
+                label=display_text,
+                command=lambda val=col: ref["column_var"].set(f"{val["column_name"]} ({val['datatype']})")
+            )
+
+
+    def validate_and_create_table(self):
+
+        for idx, ref in self.fk_references.items():
+            table = ref["table_var"].get()
+            column_full = ref["column_var"].get()
+
+            if table == "-- Select Table --" or column_full == "-- Select Column --":
+                messagebox.showerror(
+                    "Missing Selection",
+                    f"Please select a reference for FK column '{ref["fk_column"]}'"
+                )
+                return
+
+            column_name = column_full.split(" (")[0]
+            ref_datatype = column_full.split(" (")[1].rstrip(")")
+
+            if ref["fk_datatype"] != ref_datatype:
+                messagebox.showerror(
+                    "Datatype Mismatch",
+                    f"FK column '{ref['fk_column']}' has type {ref['fk_datatype']}\n"
+                    f"but references column '{column_name}' with type {ref_datatype}\n\n"
+                    f"Datatype must match!"
+                )
+                return
+
+            fk_constraint = f"CONSTRAINT fk_{self.pending_table_name}_{ref['fk_column']} FOREIGN KEY ({ref['fk_column']}) REFERENCES {table}({column_name})"
+            self.pending_column_definitions.append(fk_constraint)
+
+        self.ForKey.destroy()
+
+        self.finalize_and_execute_sql()
+
+    def finalize_and_execute_sql(self):
+
+        sql = f"CREATE TABLE {self.pending_table_name} (\n"
+        sql += ",\n".join(f"     {col}" for col in self.pending_column_definitions)
+        sql += "\n)"
+
+        print("\n" + "=" * 50)
+        print("Generated SQL:")
+        print("=" * 50)
+        print(sql)
+        print("=" * 50 + "\n")
+
+        self.execute_sql(sql, self.pending_table_name)
 
     def execute_sql(self, sql, table_name):
 
