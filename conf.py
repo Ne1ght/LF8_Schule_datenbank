@@ -137,7 +137,7 @@ class conf():
     def selected_entry(self, operation_type):
         self.dialog.destroy()
         self.conf_frame.forget()
-        Created_Entry(roo)
+        Created_Entry(root_window)
 
 
 class Created_Table():
