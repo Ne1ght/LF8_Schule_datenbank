@@ -1,5 +1,6 @@
 from tkinter import *
 from tkinter import messagebox
+import pprint
 from db import con, cur
 
 
@@ -8,6 +9,7 @@ class Delete_Entry:
         self.confroot = root_window
         self.current_table = None
         self.current_rows = []
+        self.id_column = None
 
         self.top_frame = Frame(self.confroot)
         self.top_frame.pack(fill=X, padx=10, pady=10)
@@ -90,17 +92,20 @@ class Delete_Entry:
 
     def _on_table_selected(self, table_name):
         self.current_table = table_name
+        print(f"Selected table: {table_name}")
         self.current_rows = []
         self.status_label.config(text="")
         self.rows_listbox.delete(0, END)
 
         if not table_name or table_name == "-- Select Table --":
             return
-
+            
         try:
-            cur.execute(f'SELECT ROWID, * FROM "{table_name}"')
+            cur.execute(f'SELECT * FROM "{table_name}"')
             rows = cur.fetchall()
-            columns = [desc[0] for desc in cur.description][1:]
+            pprint.pprint(rows)
+            all_columns = [desc[0] for desc in cur.description]
+            self.id_column = all_columns[0]
         except Exception as e:
             self.status_label.config(text=f"Could not load rows: {e}", fg="red")
             return
@@ -108,16 +113,21 @@ class Delete_Entry:
         if not rows:
             self.rows_listbox.insert(END, "No entries found.")
             return
+        
+        print(self.current_rows)
 
         for row in rows:
             rid = row[0]
+            print(f"Processing row with ROWID: {rid}")
             data = row[1:]
+            print(f"Row data (excluding ROWID): {data}")
             row_text = " | ".join(str(val) for val in data)
             self.current_rows.append({"rowid": rid, "display": row_text})
             self.rows_listbox.insert(END, row_text)
 
     def delete_selected_rows(self):
         selected = self.rows_listbox.curselection()
+        print(f"Selected indices for deletion: {selected}")
         if not selected:
             messagebox.showwarning("No selection", "Please select at least one entry to delete.")
             return
@@ -125,11 +135,18 @@ class Delete_Entry:
         confirm = messagebox.askyesno("Confirm Delete", "Delete the selected row(s)?")
         if not confirm:
             return
+        print(self.current_rows[index] for index in selected)
+
+        if not self.id_column:
+            messagebox.showwarning("No table", "Please select a table first.")
+            return
 
         try:
-            for index in selected[::-1]:
+            for index in selected:
                 row_info = self.current_rows[index]
-                cur.execute(f'DELETE FROM "{self.current_table}" WHERE ROWID = :rid', {"rid": row_info["rowid"]})
+
+                cur.execute(f'DELETE FROM "{self.current_table}" WHERE "{self.id_column}" = :rid',
+                            {"rid": row_info["rowid"]})
 
             con.commit()
             self.status_label.config(text="Selected entry row(s) deleted.", fg="green")

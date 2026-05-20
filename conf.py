@@ -552,29 +552,29 @@ class conf():
         os.environ["PATH"] += os.pathsep + r"C:\Users\MMO\LF8_Schule_datenbank\graphviz\bin"
 
         cur.execute("""
-    SELECT
-        cols.table_name,
-        cols.column_name,
-        cols.data_type,
-        cons.constraint_type,
-        fk_cols.table_name AS ref_table,
-        fk_cols.column_name AS ref_column   -- <-- add this
-    FROM user_tab_columns cols
-    LEFT JOIN user_cons_columns cons_cols
-        ON cols.table_name = cons_cols.table_name
-        AND cols.column_name = cons_cols.column_name
-    LEFT JOIN user_constraints cons
-        ON cons_cols.constraint_name = cons.constraint_name
-        AND cons.constraint_type IN ('P', 'R')
-    LEFT JOIN user_constraints fk_cons
-        ON cons.r_constraint_name = fk_cons.constraint_name
-    LEFT JOIN user_cons_columns fk_cols
-        ON fk_cons.constraint_name = fk_cols.constraint_name
-    LEFT JOIN user_tab_comments tab_comments
-        ON cols.table_name = tab_comments.table_name
-    WHERE tab_comments.comments = 'GUI_CREATED'
-    ORDER BY cols.table_name, cols.column_id
-""")
+        SELECT
+            cols.table_name,
+            cols.column_name,
+            cols.data_type,
+            cons.constraint_type,
+            fk_cols.table_name AS ref_table,
+            fk_cols.column_name AS ref_column   -- <-- add this
+        FROM user_tab_columns cols
+        LEFT JOIN user_cons_columns cons_cols
+            ON cols.table_name = cons_cols.table_name
+            AND cols.column_name = cons_cols.column_name
+        LEFT JOIN user_constraints cons
+            ON cons_cols.constraint_name = cons.constraint_name
+            AND cons.constraint_type IN ('P', 'R')
+        LEFT JOIN user_constraints fk_cons
+            ON cons.r_constraint_name = fk_cons.constraint_name
+        LEFT JOIN user_cons_columns fk_cols
+            ON fk_cons.constraint_name = fk_cols.constraint_name
+        LEFT JOIN user_tab_comments tab_comments
+            ON cols.table_name = tab_comments.table_name
+        WHERE tab_comments.comments = 'GUI_CREATED'
+        ORDER BY cols.table_name, cols.column_id
+        """)
     
         rows = cur.fetchall()
 
