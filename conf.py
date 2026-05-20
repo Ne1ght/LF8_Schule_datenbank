@@ -34,6 +34,17 @@ class conf():
               font=("Arial", 22, "bold"),
               bg="#F8F7F4",
               fg="#1A1A18").pack(side=LEFT)
+        
+        Button(header_frame,
+               text=" ⇄ ",
+               font=("Arial", 18),
+               bg="#F8F7F4",
+               fg="#1A1A18",
+               activebackground="#F7F6F2",
+               activeforeground="#1A1A18",
+               relief=FLAT,
+               bd=0,
+               ).pack(side=LEFT)
 
         self.status_dot = Label(header_frame,
                                 text="● Connected",
@@ -612,8 +623,6 @@ class conf():
             messagebox.showerror("Error", f"Failed to generate ER diagram:\n{e}")
     
         
-
-
 if __name__ == "__main__":
     root_window = Tk()
     app = conf(root_window)
