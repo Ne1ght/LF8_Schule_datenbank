@@ -1808,7 +1808,7 @@ class Edit_Table():
                command=self.go_back).pack(side=LEFT)
 
         Label(top_frame,
-              text="Edit a GUI-created table",
+              text="Edit a table",
               font=("Arial", 16, "bold"),
               bg="#F8F7F4",
               fg="#1A1A18").pack(side=LEFT, padx=12)
@@ -1900,7 +1900,7 @@ class Edit_Table():
                 "original_fk_table": fk_data.get("ref_table"),
                 "widgets": []
             })
-
+        
     def _fetch_table_columns(self, table_name):
         try:
             query = """
@@ -2104,7 +2104,8 @@ class Edit_Table():
                 "params": params,
                 "is_pk": is_pk,
                 "fk_table": fk_table,
-                "is_existing": row["is_existing"]
+                "is_existing": row["is_existing"],
+                "original_fk_table": row.get("original_fk_table")
             })
 
         names = [row["name"] for row in rows]
@@ -2116,7 +2117,7 @@ class Edit_Table():
         added_columns = [row for row in rows if row["name"] not in existing_names]
         removed_columns = [name for name in existing_names if name not in names]
         modified_rows = [row for row in rows if row["name"] in existing_names]
-
+        
         statements = []
         fk_changes = []
         pk_new = [row["name"] for row in rows if row["is_pk"]]
