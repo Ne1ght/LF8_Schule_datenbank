@@ -3,24 +3,14 @@ from tkinter import *
 from tkinter import messagebox
 
 import pprint
-import oracledb
-from oracledb import cursor
+from db import con, cur
+from Create_Table import Created_Table
+from Created_Entry import Created_Entry
+from Edit_Table import Edit_Table
+from Edit_Entry import Edit_Entry
+from Delete_Table import Delete_Table
+from Delete_Entry import Delete_Entry
 
-con = oracledb.connect(
-    user="system",
-    password="LF8",
-    dsn="localhost:1251/XEPDB1"
-)
-
-cur = con.cursor()
-
-# can i please just upd | Hatte problem mit Github über pycharm deswegen steht das hier
-
-# Weiteres ich bin mitten im projekt jetzt von pycharm auf VScode umgestiegen weswegen ein zwei sachen jetzt auch anders sind
-
-# Conf wurde verschönert per Claude, 
-# grundfunktionen hatte ich selber geschrieben aber damit es halbwegs schön aussieht hab ich es aufbessern lassen.
-#  Wenn ich mehr zeit hätte wäre ich noch auf QT6 umgestiegen aber eine GUI zu lernen passt nicht bis zum abgabe Termin.
 class conf():
     def __init__(self, root_window):
         self.confroot = root_window
@@ -139,8 +129,6 @@ class conf():
         r, g, b = int(r * factor), int(g * factor), int(b * factor)
         return f"#{r:02x}{g:02x}{b:02x}"
 
-        
-
     def Query_DB(self):
         query = """
                    SELECT
@@ -174,10 +162,6 @@ class conf():
         cur.execute(query)
         result = cur.fetchall()
         pprint.pprint(result)
-
-        
-
-        
 
     def open_entry_viewer(self):
         """Open the entry-viewer: first pick a table, then see its rows."""
@@ -432,7 +416,6 @@ class conf():
                cursor="hand2",
                command=viewer.destroy).pack(pady=(0, 14))
 
-
     def select_option(self, operation_type):
         if operation_type == "Query":
             self.open_entry_viewer()
@@ -526,25 +509,12 @@ class conf():
         elif operation_type == "Edit":
             Edit_Entry(self.confroot)
         elif operation_type == "Delete":
-            pass
+            Delete_Entry(self.confroot)
 
-# Die Funktion is zu 80% von mir, es wurde zwar bei Claude gefragt wie ich das in der theorie machen würde, aka den logischen ablauf.
-# die 20% die ich mit Claude gemacht hatte war das erstellen und abfragen von foreign key weswegen ich auch bei der erstellung des
-# Tables den commentar "GUI_CREATED" hinzufüge damit ich nur die Tables von Oracle bekomme die per der GUI kommen
-# Das foreign key fenster wurde auch verschönert durch claude, da sonst dort nur eine auswahlbox wäre wo dann der key mit aufkommt
-# Edit: Wie ich in der Delete Classe erwähne, die Create table ansicht ist auch von design non mir, das FK fenster ist aber wieder durch
-# claude designed
-class Created_Table():
-    def __init__(self, root_window):
-        self.confroot = root_window
-        self.row_count = 1
-        self.rows_data = []
-
-        self.Create_TFrame = Frame(self.confroot)
-        self.Create_TFrame.pack()
-
-        self.add_frame = Frame(self.confroot)
-        self.add_frame.pack()
+if __name__ == "__main__":
+    root_window = Tk()
+    app = conf(root_window)
+    root_window.mainloop()
 
         self.Menu_button = Button(self.Create_TFrame,
                                   text="Go Back",
@@ -1166,8 +1136,6 @@ class Created_Table():
         self.add_frame.forget()
         conf(self.confroot)
 
-# Gleiche Geschichte, bare bones code hab ich selbst gemacht doch bei der verschönerung gab es von claud mehrere verbesserungs punkte 
-# weswegen das hier ein gutes stück anders aussieht
 class Created_Entry():
     def __init__(self, root_window):
         self.confroot = root_window
@@ -2422,10 +2390,7 @@ class Edit_Table():
 class Edit_Entry():
     def __init__(self, root_window):
         pass
-# Die Classe werde ich so lassen damit man es sehen kann wie mein design ausehen würde
-# Werde es trozdem denke ich in einer anderen branch schöner machen, Gibt natürlich in jeder classe bugs die durch die Programmirung
-# und durch fehlende checks passieren können aber solange sie nicht stark die funktion des programms beinträchtigen werde ich diese leider
-# dabei behalten durch zeit probleme
+
 class Delete_Table:
     def __init__(self, root_window):
         self.confroot = root_window
