@@ -121,96 +121,11 @@ class Edit_Entry():
             print(f"Error fetching GUI tables: {e}")
             return []
 
-    def _fetch_columns(self, table_name):
-        print("reached fetch columns")
-
-        try:
-            cur.execute(f'SELECT * FROM "{table_name}"')
-            columns = [desc[0] for desc in cur.description]
-            pprint.pprint(columns)
-            rows = cur.fetchall()
-            
-            pprint.pprint(rows)
-
-            columns = []
-            for r in rows:
-                col_name, dtype, d_len, d_prec, d_scale, nullable = r
-
-                if dtype == "NUMBER":
-                    if d_prec is not None and d_scale is not None:
-                        display_type = f"NUMBER({d_prec},{d_scale})"
-                    elif d_prec is not None:
-                        display_type = f"NUMBER({d_prec})"
-                    else:
-                        display_type = "NUMBER"
-                elif dtype in ("VARCHAR2", "CHAR", "NVARCHAR2", "NCHAR"):
-                    display_type = f"{dtype}({d_len})"
-                else:
-                    display_type = dtype
-
-                columns.append({
-                    "name": col_name,
-                    "type": dtype,
-                    "display_type": display_type,
-                    "length": d_len,
-                    "precision": d_prec,
-                    "scale": d_scale,
-                    "nullable": nullable == "Y",
-                })
-            return columns
-        except Exception as e:
-            print(f"Error fetching columns for {table_name}: {e}")
-            return []
-
-    def _fetch_pk_columns(self, table_name):
-        try:
-            cur.execute("""
-                SELECT cols.column_name
-                FROM user_cons_columns cols
-                JOIN user_constraints cons
-                  ON cols.constraint_name = cons.constraint_name
-                WHERE cons.table_name = UPPER(:tn)
-                  AND cons.constraint_type = 'P'
-            """, {"tn": table_name})
-            return {row[0] for row in cur.fetchall()}
-        except Exception:
-            return set()
-
-    def _fetch_fk_info(self, table_name):
-        try:
-            cur.execute("""
-                SELECT
-                    a.column_name,
-                    c_pk.table_name  AS ref_table,
-                    b.column_name    AS ref_column
-                FROM user_cons_columns a
-                JOIN user_constraints  c
-                  ON a.constraint_name = c.constraint_name
-                JOIN user_constraints  c_pk
-                  ON c.r_constraint_name = c_pk.constraint_name
-                JOIN user_cons_columns b
-                  ON c_pk.constraint_name = b.constraint_name
-                 AND a.position = b.position
-                WHERE c.table_name = UPPER(:tn)
-                  AND c.constraint_type = 'R'
-            """, {"tn": table_name})
-            return {row[0]: (row[1], row[2]) for row in cur.fetchall()}
-        except Exception:
-            return {}
-
     def _on_table_selected(self, table_name):
         self.selected_table = table_name
         print(table_name)
         self.entries_list.clear()
         self.status_label.config(text="")
-
-        #self.columns_info = self._fetch_columns(table_name)
-        #self.pk_columns = self._fetch_pk_columns(table_name)
-        #self.fk_info = self._fetch_fk_info(table_name)
-
-        #if not self.columns_info:
-        #    self.status_label.config(text="Could not load columns.", fg="red")
-        #    return
 
         self._build_scroll_area()
         self._build_header(table_name)
@@ -225,6 +140,9 @@ class Edit_Entry():
     def _show_entry_table(self, table_name):
         """Fetch and display all rows of *table_name* in a scrollable grid."""
         print("reached show entry table")
+
+        for widget in self.inner_frame.winfo_children():
+            widget.destroy()
 
         try:
             cur.execute(f'SELECT * FROM "{table_name}"')
@@ -355,17 +273,15 @@ class Edit_Entry():
 
                     print(display)
 
-                    Label(inner,
-                          text=display,
-                          font=("Arial", 9),
-                          bg=bg,
-                          fg=color,
-                          width=COL_W // 8,
-                          relief=FLAT,
-                          anchor=W,
-                          padx=8,
-                          pady=5).grid(row=r_idx + 1, column=c_idx + 1,
-                                       padx=(0, 1), pady=(0, 1), sticky="nsew")
+                    e = Entry(inner,
+                            font=("Arial", 9),
+                            bg=bg,
+                            fg=color,
+                            width=COL_W // 8,
+                            relief=FLAT)
+                    e.insert(0, display)
+                    e.grid(row=r_idx + 1, column=c_idx + 1,
+                    padx=(0, 1), pady=(0, 1), sticky="nsew")
 
         Button(self.inner_frame,
                text="Close",
@@ -423,138 +339,6 @@ class Edit_Entry():
               width=4,
               bg="lightgray").grid(row=0, column=len(self.columns_info) + 1,
                                    padx=1, pady=1, sticky="nsew")
-
-    def _add_entry_row(self):
-        row_num = len(self.entries_list) + 1
-        grid_row = row_num
-
-        row_widgets = {}
-
-        Label(self.inner_frame,
-              text=str(row_num),
-              font=("Arial", 9),
-              relief=GROOVE,
-              width=4).grid(row=grid_row, column=0, padx=1, pady=1, sticky="nsew")
-
-        for col_idx, col in enumerate(self.columns_info):
-            col_name = col["name"]
-            is_fk = col_name in self.fk_info
-
-            if is_fk:
-                fk_var = StringVar(value="-- Select --")
-                fk_values = self._fetch_fk_values(*self.fk_info[col_name])
-                if not fk_values:
-                    fk_values = ["(no data)"]
-                opt = OptionMenu(self.inner_frame, fk_var, *fk_values)
-                opt.config(width=18)
-                opt.grid(row=grid_row, column=col_idx + 1, padx=1, pady=1, sticky="nsew")
-                row_widgets[col_name] = {"widget": opt, "var": fk_var, "kind": "fk"}
-            else:
-                entry = Entry(self.inner_frame, width=20)
-                entry.grid(row=grid_row, column=col_idx + 1, padx=1, pady=1, sticky="nsew")
-                row_widgets[col_name] = {"widget": entry, "var": None, "kind": "entry"}
-
-        del_btn = Button(self.inner_frame,
-                         text="✕",
-                         font=("Arial", 8),
-                         fg="red",
-                         width=3,
-                         command=lambda r=row_num: self._delete_entry_row(r))
-        del_btn.grid(row=grid_row, column=len(self.columns_info) + 1,
-                     padx=1, pady=1, sticky="nsew")
-
-        self.entries_list.append({
-            "row_num": row_num,
-            "grid_row": grid_row,
-            "widgets": row_widgets,
-            "del_btn": del_btn,
-            "row_label": None,
-        })
-
-        self.inner_frame.update_idletasks()
-        self.canvas.configure(scrollregion=self.canvas.bbox("all"))
-
-    def _delete_entry_row(self, row_num):
-        idx = next((i for i, r in enumerate(self.entries_list)
-                    if r["row_num"] == row_num), None)
-        if idx is None:
-            return
-
-        row_data = self.entries_list[idx]
-        grid_row = row_data["grid_row"]
-
-        for widget in self.inner_frame.grid_slaves(row=grid_row):
-            widget.destroy()
-
-        self.entries_list.pop(idx)
-        self._rebuild_rows()
-
-    def _rebuild_rows(self):
-        for widget in self.inner_frame.winfo_children():
-            info = widget.grid_info()
-            if info and int(info.get("row", 0)) > 0:
-                widget.destroy()
-
-        old_entries = self.entries_list[:]
-        self.entries_list.clear()
-
-        for new_idx, old_row in enumerate(old_entries):
-            row_num = new_idx + 1
-            grid_row = row_num
-
-            Label(self.inner_frame,
-                  text=str(row_num),
-                  font=("Arial", 9),
-                  relief=GROOVE,
-                  width=4).grid(row=grid_row, column=0, padx=1, pady=1, sticky="nsew")
-
-            new_widgets = {}
-            for col_idx, col in enumerate(self.columns_info):
-                col_name = col["name"]
-                old_wd = old_row["widgets"][col_name]
-
-                if old_wd["kind"] == "fk":
-                    fk_var = StringVar(value=old_wd["var"].get())
-                    fk_values = self._fetch_fk_values(*self.fk_info[col_name])
-                    if not fk_values:
-                        fk_values = ["(no data)"]
-                    opt = OptionMenu(self.inner_frame, fk_var, *fk_values)
-                    opt.config(width=18)
-                    opt.grid(row=grid_row, column=col_idx + 1, padx=1, pady=1, sticky="nsew")
-                    new_widgets[col_name] = {"widget": opt, "var": fk_var, "kind": "fk"}
-                else:
-                    old_value = old_wd["widget"].get()
-                    entry = Entry(self.inner_frame, width=20)
-                    entry.insert(0, old_value)
-                    entry.grid(row=grid_row, column=col_idx + 1, padx=1, pady=1, sticky="nsew")
-                    new_widgets[col_name] = {"widget": entry, "var": None, "kind": "entry"}
-
-            del_btn = Button(self.inner_frame,
-                             text="✕",
-                             font=("Arial", 8),
-                             fg="red",
-                             width=3,
-                             command=lambda r=row_num: self._delete_entry_row(r))
-            del_btn.grid(row=grid_row, column=len(self.columns_info) + 1,
-                         padx=1, pady=1, sticky="nsew")
-
-            self.entries_list.append({
-                "row_num": row_num,
-                "grid_row": grid_row,
-                "widgets": new_widgets,
-                "del_btn": del_btn,
-            })
-
-        self.inner_frame.update_idletasks()
-        self.canvas.configure(scrollregion=self.canvas.bbox("all"))
-
-    def _fetch_fk_values(self, ref_table, ref_column):
-        try:
-            cur.execute(f'SELECT "{ref_column}" FROM "{ref_table}" ORDER BY 1')
-            return [str(row[0]) for row in cur.fetchall()]
-        except Exception as e:
-            print(f"Error fetching FK values from {ref_table}.{ref_column}: {e}")
-            return []
 
     def _validate_and_insert(self):
         self.status_label.config(text="", fg="black")
