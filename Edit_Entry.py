@@ -2,6 +2,7 @@ from tkinter import *
 from tkinter import messagebox
 import oracledb
 from db import con, cur
+import pprint
 
 class Edit_Entry():
     def __init__(self, root_window):
@@ -121,20 +122,15 @@ class Edit_Entry():
             return []
 
     def _fetch_columns(self, table_name):
+        print("reached fetch columns")
+
         try:
-            cur.execute("""
-                SELECT
-                    column_name,
-                    data_type,
-                    data_length,
-                    data_precision,
-                    data_scale,
-                    nullable
-                FROM user_tab_columns
-                WHERE table_name = UPPER(:tn)
-                ORDER BY column_id
-            """, {"tn": table_name})
+            cur.execute(f'SELECT * FROM "{table_name}"')
+            columns = [desc[0] for desc in cur.description]
+            pprint.pprint(columns)
             rows = cur.fetchall()
+            
+            pprint.pprint(rows)
 
             columns = []
             for r in rows:
@@ -204,26 +200,202 @@ class Edit_Entry():
 
     def _on_table_selected(self, table_name):
         self.selected_table = table_name
+        print(table_name)
         self.entries_list.clear()
         self.status_label.config(text="")
 
-        self.columns_info = self._fetch_columns(table_name)
-        self.pk_columns = self._fetch_pk_columns(table_name)
-        self.fk_info = self._fetch_fk_info(table_name)
+        #self.columns_info = self._fetch_columns(table_name)
+        #self.pk_columns = self._fetch_pk_columns(table_name)
+        #self.fk_info = self._fetch_fk_info(table_name)
 
-        if not self.columns_info:
-            self.status_label.config(text="Could not load columns.", fg="red")
-            return
+        #if not self.columns_info:
+        #    self.status_label.config(text="Could not load columns.", fg="red")
+        #    return
 
         self._build_scroll_area()
-        self._build_header()
+        self._build_header(table_name)
 
         self.add_row_button.config(state=NORMAL)
         self.insert_button.config(state=NORMAL)
 
-        self._add_entry_row()
 
-    def _build_header(self):
+        self._show_entry_table(table_name)
+        #self._add_entry_row()
+
+    def _show_entry_table(self, table_name):
+        """Fetch and display all rows of *table_name* in a scrollable grid."""
+        print("reached show entry table")
+
+        try:
+            cur.execute(f'SELECT * FROM "{table_name}"')
+            columns = [desc[0] for desc in cur.description]
+            rows = cur.fetchall()
+        except Exception as e:
+            messagebox.showerror("DB Error", f"Could not query {table_name}:\n{e}")
+            return
+
+        
+        #viewer = Toplevel(self.confroot)
+        #viewer.title(f"Entries — {table_name}")
+        #viewer.geometry("860x520")
+        #viewer.configure(bg="#F8F7F4")
+
+        
+        hdr = Frame(self.inner_frame, bg="#F8F7F4")
+        hdr.pack(fill=X, padx=20, pady=(16, 8))
+
+        Label(hdr,
+              text=table_name,
+              font=("Arial", 15, "bold"),
+              bg="#F8F7F4",
+              fg="#1A1A18").pack(side=LEFT)
+
+        Label(hdr,
+              text=f"{len(rows)} row{'s' if len(rows) != 1 else ''}  ·  {len(columns)} column{'s' if len(columns) != 1 else ''}",
+              font=("Arial", 10),
+              bg="#F8F7F4",
+              fg="#888780").pack(side=RIGHT, pady=4)
+
+        Frame(self.inner_frame, height=1, bg="#D3D1C7").pack(fill=X, padx=20, pady=(0, 10))
+
+        
+        canvas_frame = Frame(self.inner_frame, bg="#F8F7F4")
+        canvas_frame.pack(fill=BOTH, expand=True, padx=20, pady=(0, 16))
+
+        v_sb = Scrollbar(canvas_frame, orient=VERTICAL)
+        v_sb.pack(side=RIGHT, fill=Y)
+
+        h_sb = Scrollbar(canvas_frame, orient=HORIZONTAL)
+        h_sb.pack(side=BOTTOM, fill=X)
+
+        canvas = Canvas(canvas_frame,
+                        yscrollcommand=v_sb.set,
+                        xscrollcommand=h_sb.set,
+                        bg="#F8F7F4",
+                        highlightthickness=0)
+        canvas.pack(side=LEFT, fill=BOTH, expand=True)
+
+        v_sb.config(command=canvas.yview)
+        h_sb.config(command=canvas.xview)
+
+        inner = Frame(canvas, bg="#F8F7F4")
+        cw = canvas.create_window((0, 0), window=inner, anchor=NW)
+
+        inner.bind("<Configure>",
+                   lambda e: canvas.configure(scrollregion=canvas.bbox("all")))
+        canvas.bind("<Configure>",
+                    lambda e: canvas.itemconfig(cw, width=e.width))
+        canvas.bind_all("<MouseWheel>",
+                        lambda e: canvas.yview_scroll(int(-1 * (e.delta / 120)), "units"))
+
+       
+        COL_W = 160
+        HDR_BG = "#D3D1C7"
+        HDR_FG = "#2C2C2A"
+        ROW_BG = "#FFFFFF"
+        ALT_BG = "#F1EFE8"
+        CELL_FG = "#2C2C2A"
+        NULL_FG = "#B4B2A9"
+
+        
+        Label(inner,
+              text="#",
+              font=("Arial", 9, "bold"),
+              bg=HDR_BG,
+              fg=HDR_FG,
+              width=5,
+              relief=FLAT,
+              anchor=CENTER,
+              pady=7).grid(row=0, column=0, padx=(0, 1), pady=(0, 1), sticky="nsew")
+
+        for c_idx, col_name in enumerate(columns):
+            Label(inner,
+                  text=col_name,
+                  font=("Arial", 9, "bold"),
+                  bg=HDR_BG,
+                  fg=HDR_FG,
+                  width=COL_W // 8,
+                  relief=FLAT,
+                  anchor=W,
+                  padx=8,
+                  pady=7).grid(row=0, column=c_idx + 1,
+                               padx=(0, 1), pady=(0, 1), sticky="nsew")
+
+       
+        if not rows:
+            Label(inner,
+                  text="No entries found.",
+                  font=("Arial", 10),
+                  bg=ROW_BG,
+                  fg=NULL_FG,
+                  pady=12).grid(row=1, column=0,
+                                columnspan=len(columns) + 1,
+                                sticky="nsew")
+        else:
+            for r_idx, row in enumerate(rows):
+                bg = ROW_BG if r_idx % 2 == 0 else ALT_BG
+
+                print(row)
+
+                Label(inner,
+                      text=str(r_idx + 1),
+                      font=("Arial", 9),
+                      bg=bg,
+                      fg=NULL_FG,
+                      width=5,
+                      relief=FLAT,
+                      anchor=CENTER,
+                      pady=5).grid(row=r_idx + 1, column=0,
+                                   padx=(0, 1), pady=(0, 1), sticky="nsew")
+
+                for c_idx, value in enumerate(row):
+                    is_null = value is None
+                    display = "(null)" if is_null else str(value)
+                    color = NULL_FG if is_null else CELL_FG
+
+                    print(display)
+
+                    Label(inner,
+                          text=display,
+                          font=("Arial", 9),
+                          bg=bg,
+                          fg=color,
+                          width=COL_W // 8,
+                          relief=FLAT,
+                          anchor=W,
+                          padx=8,
+                          pady=5).grid(row=r_idx + 1, column=c_idx + 1,
+                                       padx=(0, 1), pady=(0, 1), sticky="nsew")
+
+        Button(self.inner_frame,
+               text="Close",
+               font=("Arial", 10),
+               bg="#E8E7E1",
+               fg="#444441",
+               activebackground="#D3D1C7",
+               relief=FLAT,
+               padx=16,
+               pady=6,
+               cursor="hand2",
+               command=self.inner_frame.destroy).pack(pady=(0, 14))
+
+    def _build_header(self, table_name):
+        
+        print("reached build header")
+        cur.execute(f'SELECT * FROM "{table_name}"')
+        columns = [desc[0] for desc in cur.description]
+        pprint.pprint(columns)
+        rows = cur.fetchall()
+        pprint.pprint(rows)
+
+        COL_W = 160
+        HDR_BG = "#D3D1C7"
+        HDR_FG = "#2C2C2A"
+        ROW_BG = "#FFFFFF"
+        ALT_BG = "#F1EFE8"
+        CELL_FG = "#2C2C2A"
+        NULL_FG = "#B4B2A9"
+
         Label(self.inner_frame,
               text="#",
               font=("Arial", 9, "bold"),
@@ -231,27 +403,18 @@ class Edit_Entry():
               width=4,
               bg="lightgray").grid(row=0, column=0, padx=1, pady=1, sticky="nsew")
 
-        for col_idx, col in enumerate(self.columns_info):
-            is_pk = col["name"] in self.pk_columns
-            is_fk = col["name"] in self.fk_info
-
-            badge = ""
-            if is_pk:
-                badge = " 🔑"
-            if is_fk:
-                badge = " 🔗"
-
-            header_text = f"{col['name']}{badge}\n{col['display_type']}"
-            if not col["nullable"] and not is_pk:
-                header_text += "\n*required"
-
+        for c_idx, col_name in enumerate(columns):
             Label(self.inner_frame,
-                  text=header_text,
+                  text=col_name,
                   font=("Arial", 9, "bold"),
-                  relief=RIDGE,
-                  width=20,
-                  bg="lightgray",
-                  justify=CENTER).grid(row=0, column=col_idx + 1, padx=1, pady=1, sticky="nsew")
+                  bg=HDR_BG,
+                  fg=HDR_FG,
+                  width=COL_W // 8,
+                  relief=FLAT,
+                  anchor=W,
+                  padx=8,
+                  pady=7).grid(row=0, column=c_idx + 1,
+                               padx=(0, 1), pady=(0, 1), sticky="nsew")
 
         Label(self.inner_frame,
               text="Del",

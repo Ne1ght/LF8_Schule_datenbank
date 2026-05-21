@@ -283,10 +283,12 @@ class conf():
 
     def _show_entry_table(self, table_name):
         """Fetch and display all rows of *table_name* in a scrollable grid."""
+
         try:
             cur.execute(f'SELECT * FROM "{table_name}"')
             columns = [desc[0] for desc in cur.description]
             rows = cur.fetchall()
+
         except Exception as e:
             messagebox.showerror("DB Error", f"Could not query {table_name}:\n{e}")
             return
@@ -392,6 +394,8 @@ class conf():
             for r_idx, row in enumerate(rows):
                 bg = ROW_BG if r_idx % 2 == 0 else ALT_BG
 
+                print(row)
+
                 Label(inner,
                       text=str(r_idx + 1),
                       font=("Arial", 9),
@@ -407,6 +411,8 @@ class conf():
                     is_null = value is None
                     display = "(null)" if is_null else str(value)
                     color = NULL_FG if is_null else CELL_FG
+
+                    print(display)
 
                     Label(inner,
                           text=display,
