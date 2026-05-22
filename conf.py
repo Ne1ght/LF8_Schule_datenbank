@@ -6,7 +6,8 @@ from sqlalchemy import Date, Integer, String, create_engine, MetaData, inspect
 from eralchemy import render_er
 import subprocess
 import os
-
+import queue
+import threading
 import pprint
 from db import con, cur
 from Create_Table import Created_Table
@@ -16,11 +17,113 @@ from Edit_Entry import Edit_Entry
 from Delete_Table import Delete_Table
 from Delete_Entry import Delete_Entry
 
+
+class TerminalWidget:
+    """Embedded terminal widget with output display and command input."""
+    def __init__(self, parent):
+        self.frame = Frame(parent, bg="#1e1e1e")
+
+        # ── output area ────────────────────────────────
+        self.output = Text(
+            self.frame,
+            bg="#1e1e1e", fg="#d4d4d4",
+            font=("Consolas", 10),
+            insertbackground="white",
+            relief=FLAT, bd=0,
+            state=DISABLED, 
+            height=10          # read-only; user types in entry below
+        )
+        sb = Scrollbar(self.frame, command=self.output.yview)
+        self.output.config(yscrollcommand=sb.set)
+        sb.pack(side=RIGHT, fill=Y)
+        self.output.pack(fill=BOTH, expand=True)
+
+        # ── input row ──────────────────────────────────
+        input_frame = Frame(self.frame, bg="#252526")
+        input_frame.pack(fill=X)
+        Label(input_frame, text="$ ",
+              bg="#252526", fg="#1d9e75",
+              font=("Consolas", 10)).pack(side=LEFT, padx=(8, 0))
+        self.entry = Entry(input_frame,
+              bg="#252526", fg="#d4d4d4",
+              font=("Consolas", 10),
+              insertbackground="white", relief=FLAT)
+        self.entry.pack(fill=X, expand=True, padx=(4, 8), pady=6)
+        self.entry.bind("<Return>", self.run_command)
+        self.entry.bind("<Up>",    self.history_up)
+        self.entry.bind("<Down>",  self.history_down)
+
+        self._history, self._hist_idx = [], -1
+        self._queue = queue.Queue()
+        self.frame.after(50, self._poll_queue)   # drain output on main thread
+
+    # ── public: embed anywhere ──────────────────────
+    def pack(self, **kw):
+        self.frame.pack(**kw)
+
+    def grid(self, **kw):
+        self.frame.grid(**kw)
+
+    def write(self, text, tag=None):
+        self.output.config(state=NORMAL)
+        self.output.insert(END, text, tag or ())
+        self.output.see(END)
+        self.output.config(state=DISABLED)
+
+    def run_command(self, event=None):
+        cmd = self.entry.get().strip()
+        if not cmd:
+            return
+        self._history.insert(0, cmd)
+        self._hist_idx = -1
+        self.entry.delete(0, END)
+        self.write(f"$ {cmd}\n")
+        # Route SQL directly through the DB connection
+        if cmd.upper().startswith(("SELECT", "INSERT", "UPDATE", "DELETE", "CREATE", "DROP", "ALTER", "SHOW")):
+            threading.Thread(target=self._exec_sql, args=(cmd,), daemon=True).start()
+        else:
+            threading.Thread(target=self._exec, args=(cmd,), daemon=True).start()
+
+    def _exec_sql(self, cmd):
+        try:
+            from db import cur, con
+            cur.execute(cmd)
+            if cmd.strip().upper().startswith("SELECT"):
+                cols = [d[0] for d in cur.description]
+                self._queue.put("  ".join(cols) + "\n")
+                self._queue.put("─" * 60 + "\n")
+                for row in cur.fetchall():
+                    self._queue.put("  ".join(str(v) if v is not None else "NULL" for v in row) + "\n")
+            else:
+                con.commit()
+                self._queue.put(f"OK — {cur.rowcount} row(s) affected\n")
+            self._queue.put("\n[done]\n")
+        except Exception as e:
+            self._queue.put(f"SQL Error: {e}\n")
+
+    def _poll_queue(self):
+        while not self._queue.empty():
+            self.write(self._queue.get_nowait())
+        self.frame.after(50, self._poll_queue)
+
+    def history_up(self, e):
+        if self._history:
+            self._hist_idx = min(self._hist_idx + 1, len(self._history) - 1)
+            self.entry.delete(0, END)
+            self.entry.insert(0, self._history[self._hist_idx])
+
+    def history_down(self, e):
+        self._hist_idx = max(self._hist_idx - 1, -1)
+        self.entry.delete(0, END)
+        if self._hist_idx >= 0:
+            self.entry.insert(0, self._history[self._hist_idx])
+
+
 class conf():
     def __init__(self, root_window):
         self.confroot = root_window
         self.confroot.title("DB Manager")
-        self.confroot.geometry("680x520")
+        self.confroot.geometry("680x700")
         self.confroot.configure(bg="#F8F7F4")
 
         self.conf_frame = Frame(self.confroot, bg="#F8F7F4")
@@ -117,6 +220,20 @@ class conf():
 
         self._make_debug_btn(debug_frame, "Print table schema", self.Query_DB)
         self._make_debug_btn(debug_frame, "Browse table entries", self.open_entry_viewer)
+
+        # ── Terminal widget below debug tools ────────────────────────
+        Frame(self.conf_frame, height=1, bg="#D3D1C7").pack(fill=X, pady=(14, 10))
+
+        Label(self.conf_frame,
+             text="Terminal",
+             font=("Arial", 10),
+             bg="#F8F7F4",
+             fg="#888780").pack(anchor=W, pady=(0, 8))
+
+        self.terminal = TerminalWidget(self.conf_frame)
+        self.terminal.frame.config(height=200)
+        self.terminal.pack(fill=BOTH, expand=True, pady=(0, 0))
+        self.terminal.write("Terminal ready.\n")
 
     def _make_debug_btn(self, parent, text, cmd):
         btn = Button(parent,
