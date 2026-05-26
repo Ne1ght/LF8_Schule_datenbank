@@ -120,7 +120,7 @@ class Edit_Table():
             fk_data = self.fk_info.get(col_name, {})
             self.rows_data.append({
                 "original_name": col_name,
-                "name_var": StringVar(value=col_name),
+                "name_var": StringVar(value=col_name.upper()),
                 "datatype_var": StringVar(value=datatype),
                 "params_var": StringVar(value=params),
                 "pk_var": IntVar(value=1 if is_pk else 0),
@@ -143,7 +143,7 @@ class Edit_Table():
             columns = []
             for column_name, data_type, data_length, data_precision, data_scale, nullable in rows:
                 columns.append({
-                    "name": column_name,
+                    "name": column_name.upper(),
                     "data_type": data_type,
                     "data_length": data_length,
                     "data_precision": data_precision,
@@ -188,7 +188,7 @@ class Edit_Table():
             for column_name, ref_table, ref_column, constraint_name in cur.fetchall():
                 result[column_name] = {
                     "ref_table": ref_table,
-                    "ref_column": ref_column,
+                    "ref_column": ref_column.upper(),
                     "constraint_name": constraint_name
                 }
             return result
@@ -563,7 +563,7 @@ class Edit_Table():
                         "pk_colums": []
                     }
                 tables[table_name]["pk_colums"].append({
-                    "column_name": column_name,
+                    "column_name": column_name.upper(),
                     "datatype": self._format_datatype(*self._normalize_datatype({
                         "data_type": data_type,
                         "data_precision": data_precision,

@@ -186,7 +186,7 @@ class Created_Table():
         foreign_keys = []
 
         for row in self.rows_data:
-            column_name = row["entry_name"].get().strip()
+            column_name = row["entry_name"].get().strip().upper()
             datatype = row["datatype"]
             parameters = row["entry_parameters"].get().strip()
             is_pk = row["var_pk"].get()

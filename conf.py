@@ -4,11 +4,14 @@ from tkinter import *
 from tkinter import messagebox
 from sqlalchemy import Date, Integer, String, create_engine, MetaData, inspect
 from eralchemy import render_er
+import yaerrrr
 import subprocess
 import os
 import queue
 import threading
+import tempfile
 import pprint
+import traceback
 from db import con, cur
 from Create_Table import Created_Table
 from Created_Entry import Created_Entry
@@ -44,12 +47,13 @@ class TerminalWidget:
         Label(input_frame, text="$ ",
               bg="#252526", fg="#1d9e75",
               font=("Consolas", 10)).pack(side=LEFT, padx=(8, 0))
-        self.entry = Entry(input_frame,
-              bg="#252526", fg="#d4d4d4",
-              font=("Consolas", 10),
-              insertbackground="white", relief=FLAT)
-        self.entry.pack(fill=X, expand=True, padx=(4, 8), pady=6)
-        self.entry.bind("<Return>", self.run_command)
+        self.entry = Text(input_frame,
+            bg="#252526", fg="#d4d4d4",
+            font=("Consolas", 10),
+            insertbackground="white",
+            height=4, wrap="none")
+        self.entry.pack(fill=BOTH, expand=True, padx=(4, 8), pady=6)
+        self.entry.bind("<Control-Return>", self.run_command)
         self.entry.bind("<Up>",    self.history_up)
         self.entry.bind("<Down>",  self.history_down)
 
@@ -71,12 +75,12 @@ class TerminalWidget:
         self.output.config(state=DISABLED)
 
     def run_command(self, event=None):
-        cmd = self.entry.get().strip()
+        cmd = self.entry.get("1.0", END).strip()
         if not cmd:
             return
         self._history.insert(0, cmd)
         self._hist_idx = -1
-        self.entry.delete(0, END)
+        self.entry.delete("1.0", END)
         self.write(f"$ {cmd}\n")
         # Route SQL directly through the DB connection
         if cmd.upper().startswith(("SELECT", "INSERT", "UPDATE", "DELETE", "CREATE", "DROP", "ALTER", "SHOW")):
@@ -90,16 +94,47 @@ class TerminalWidget:
             cur.execute(cmd)
             if cmd.strip().upper().startswith("SELECT"):
                 cols = [d[0] for d in cur.description]
-                self._queue.put("  ".join(cols) + "\n")
-                self._queue.put("─" * 60 + "\n")
-                for row in cur.fetchall():
-                    self._queue.put("  ".join(str(v) if v is not None else "NULL" for v in row) + "\n")
+                rows = cur.fetchall()
+
+                MAX_COL_WIDTH = 30
+
+                widths = [min(len(col), MAX_COL_WIDTH) for col in cols]
+                for row in rows:
+                    for i, val in enumerate(row):
+                        widths[i] = min(max(widths[i], len(str(val) if val is not None else "NULL")), MAX_COL_WIDTH)
+
+                header  = "  ".join(col.ljust(widths[i])  for i, col in enumerate(cols))
+                divider = "  ".join("─" * widths[i]       for i in range(len(cols)))
+                self._queue.put(header  + "\n")
+                self._queue.put(divider + "\n")
+
+                for row in rows:
+                    line = "  ".join(
+                        (str(v).strip() if v is not None else "NULL").ljust(widths[i])
+                        for i, v in enumerate(row)
+                    )
+                    self._queue.put(line + "\n")
             else:
                 con.commit()
                 self._queue.put(f"OK — {cur.rowcount} row(s) affected\n")
             self._queue.put("\n[done]\n")
         except Exception as e:
             self._queue.put(f"SQL Error: {e}\n")
+
+    def _exec(self, cmd):
+        try:
+            proc = subprocess.Popen(
+                cmd, shell=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                text=True, bufsize=1,
+            )
+            for line in proc.stdout:
+                self._queue.put(line)
+            proc.wait()
+            self._queue.put(f"\n[exited {proc.returncode}]\n")
+        except Exception as e:
+            self._queue.put(f"Error: {e}\n")
 
     def _poll_queue(self):
         while not self._queue.empty():
@@ -173,7 +208,7 @@ class conf():
             ("Create", "Add new tables or entries", "#E1F5EE", "#0F6E56", "#085041", "Created"),
             ("Edit", "Modify existing data", "#E6F1FB", "#185FA5", "#0C447C", "Edit"),
             ("Delete", "Remove tables or entries", "#FCEBEB", "#A32D2D", "#791F1F", "Delete"),
-            ("Query", "Create ER Diagram", "#FAEEDA", "#854F0B", "#633806", "Query"),
+            ("Query", "Create Diagrams", "#FAEEDA", "#854F0B", "#633806", "Query"),
         ]
 
         for i, (title, subtitle, bg, fg_title, fg_sub, op) in enumerate(card_specs):
@@ -567,7 +602,7 @@ class conf():
         elif operation_type == "Delete":
             verb, adj = "Delete", "existing"
         else:
-            verb, adj = "Query", ""
+            verb, adj = "Query Rational", "Query Chen"
 
         dialog = Toplevel(self.confroot)
         dialog.title(verb)
@@ -625,7 +660,7 @@ class conf():
         
         else:
             Button(btn_row,
-                   text=f"Show ER Diagram  ",
+                   text=f"Show Rational Diagram  ",
                    font=("Arial", 11),
                    bg="#A59018",
                    fg="#FFFFFF",
@@ -637,6 +672,20 @@ class conf():
                    cursor="hand2",
                    command=lambda: (dialog.destroy(),
                                     self.draw_er_diagram())).pack(side=LEFT, padx=8)
+            
+            Button(btn_row,
+                   text=f"Show Chen Diagram  ",
+                   font=("Arial", 11),
+                   bg="#185FA5",
+                   fg="#FFFFFF",
+                   activebackground="#0C447C",
+                   activeforeground="#FFFFFF",
+                   relief=FLAT,
+                   padx=14,
+                   pady=8,
+                   cursor="hand2",
+                   command=lambda: (dialog.destroy(),
+                                    self.draw_chen_diagram())).pack(side=LEFT, padx=8)
 
         Button(btn_row,
                text="Cancel",
@@ -669,6 +718,8 @@ class conf():
             Edit_Entry(self.confroot)
         elif operation_type == "Delete":
             Delete_Entry(self.confroot)
+        elif operation_type == "Query":
+            self.draw_er_diagram()
 
     def draw_er_diagram(self):
 
@@ -745,6 +796,93 @@ class conf():
         except Exception as e:
             messagebox.showerror("Error", f"Failed to generate ER diagram:\n{e}")
     
+
+    def draw_chen_diagram(self):
+    
+        os.environ["PATH"] += os.pathsep + r"C:\Users\MMO\LF8_Schule_datenbank\graphviz\bin"
+
+        cur.execute("""
+            SELECT
+                cols.table_name,
+                cols.column_name,
+                cols.data_type,
+                cons.constraint_type,
+                fk_cols.table_name AS ref_table,
+                fk_cols.column_name AS ref_column
+            FROM user_tab_columns cols
+            LEFT JOIN user_cons_columns cons_cols
+                ON cols.table_name = cons_cols.table_name
+                AND cols.column_name = cons_cols.column_name
+            LEFT JOIN user_constraints cons
+                ON cons_cols.constraint_name = cons.constraint_name
+                AND cons.constraint_type IN ('P', 'R')
+            LEFT JOIN user_constraints fk_cons
+                ON cons.r_constraint_name = fk_cons.constraint_name
+            LEFT JOIN user_cons_columns fk_cols
+                ON fk_cons.constraint_name = fk_cols.constraint_name
+            LEFT JOIN user_tab_comments tab_comments
+                ON cols.table_name = tab_comments.table_name
+            WHERE tab_comments.comments = 'GUI_CREATED'
+            ORDER BY cols.table_name, cols.column_id
+        """)
+        rows = cur.fetchall()
+
+        # Struktur aufbauen
+        tables_dict = {}
+        for table_name, col_name, data_type, constraint_type, ref_table, ref_column in rows:
+            if table_name not in tables_dict:
+                tables_dict[table_name] = {"cols": [], "fks": []}
+            tables_dict[table_name]["cols"].append((col_name, constraint_type))
+            if constraint_type == 'R' and ref_table:
+                tables_dict[table_name]["fks"].append((table_name, ref_table, col_name))
+
+        # .dot Datei manuell bauen (Chen-Stil)
+        project_dir = os.path.dirname(os.path.abspath(__file__))
+        dot_path    = os.path.join(project_dir, "er_chen_diagram.dot")
+        output_path = os.path.join(project_dir, "er_chen_diagram.svg")
+
+        lines = ["digraph ER {", "    graph [rankdir=LR];"]
+
+        for table_name, info in tables_dict.items():
+            pk_cols = [c for c, t in info["cols"] if t == 'P']
+            other_cols = [c for c, t in info["cols"] if t != 'P']
+
+            pk_rows    = "".join(f"<tr><td><u>{c}</u></td></tr>" for c in pk_cols)
+            other_rows = "".join(f"<tr><td>{c}</td></tr>"        for c in other_cols)
+
+            lines.append(
+                f'    "{table_name}" [shape=none, label=<<table border="1" cellborder="0" cellspacing="0">'
+                f'<tr><td bgcolor="#BBDEFB"><b>{table_name}</b></td></tr>'
+                f'{pk_rows}{other_rows}</table>>];'
+            )
+
+        seen = set()
+        for table_name, info in tables_dict.items():
+            for from_table, to_table, via_col in info["fks"]:
+                key = (from_table, to_table)
+                if key not in seen:
+                    seen.add(key)
+                    lines.append(f'    "{to_table}" -> "{from_table}" [label="{via_col}", arrowhead=crow, arrowtail=none, dir=both];')
+
+        lines.append("}")
+
+        with open(dot_path, "w", encoding="utf-8") as f:
+            f.write("\n".join(lines))
+
+        try:
+            # Zwei separate Argumente — kein Windows-Bug
+            result = subprocess.run(
+                ["dot", "-Tsvg", "-o", output_path, dot_path],
+                capture_output=True, text=True
+            )
+            if result.returncode != 0:
+                raise Exception(result.stderr)
+
+            messagebox.showinfo("Chen ER Diagram", f"Gespeichert als '{output_path}'.")
+            os.startfile(output_path)
+        except Exception as e:
+            traceback.print_exc()
+            messagebox.showerror("Fehler", f"Chen-Diagramm konnte nicht erstellt werden:\n{e}")
         
 if __name__ == "__main__":
     root_window = Tk()

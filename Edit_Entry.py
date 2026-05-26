@@ -438,7 +438,7 @@ class Edit_Entry():
                 "widgets": {},
                 "marked_for_delete": False,
                 "grid_row": None,
-                "column_names": columns  # Store column names for reference
+                "column_names": columns.upper()  # Store column names for reference
             })
 
         print(f"Loaded {len(self.existing_rows)} existing rows")
@@ -708,7 +708,7 @@ class Edit_Entry():
                     pk_values[pk_col] = update_data["original"][pk_col]
 
                 set_clause = ", ".join([f'"{col}" = :{self.bind_name(col)}' for col in update_data["changes"].keys()])
-                where_clause = " AND ".join([f'"{pk}" = :{self.bind_name(pk)}' for pk in self.pk_columns])
+                where_clause = " AND ".join([f'"{pk}" = :pk_{self.bind_name(pk)}' for pk in self.pk_columns])
 
                 bind_vars = {self.bind_name(k): v for k, v in update_data["changes"].items()}
                 for pk_col in self.pk_columns:

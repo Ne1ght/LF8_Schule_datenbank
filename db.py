@@ -1,5 +1,11 @@
 import oracledb
 
+connection_info = (
+    "system",
+    "LF8",
+    "localhost:1251/XEPDB1"
+)
+
 con = oracledb.connect(
     user="system",
     password="LF8",
@@ -7,3 +13,5 @@ con = oracledb.connect(
 )
 
 cur = con.cursor()
+
+

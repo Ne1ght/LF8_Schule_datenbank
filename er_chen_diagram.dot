@@ -1,0 +1,11 @@
+digraph ER {
+    graph [rankdir=LR];
+    "DELETE_TEST" [shape=none, label=<<table border="1" cellborder="0" cellspacing="0"><tr><td bgcolor="#BBDEFB"><b>DELETE_TEST</b></td></tr><tr><td><u>ID</u></td></tr><tr><td>NAME_OF_ID</td></tr></table>>];
+    "MITARBEITER_TEST" [shape=none, label=<<table border="1" cellborder="0" cellspacing="0"><tr><td bgcolor="#BBDEFB"><b>MITARBEITER_TEST</b></td></tr><tr><td><u>MITARBEITER_ID</u></td></tr><tr><td>VORNAME</td></tr><tr><td>MITTELNAME</td></tr><tr><td>NACHNAME</td></tr><tr><td>ADRESSE</td></tr><tr><td>ORT</td></tr><tr><td>ABTEILUNG</td></tr><tr><td>JOBBEZEICHNUNG</td></tr><tr><td>TELEFONNUMMER</td></tr><tr><td>Anfangs Datum</td></tr></table>>];
+    "TEAMS_TEST" [shape=none, label=<<table border="1" cellborder="0" cellspacing="0"><tr><td bgcolor="#BBDEFB"><b>TEAMS_TEST</b></td></tr><tr><td>TEAMS_ID</td></tr><tr><td>TEAM_NAME</td></tr><tr><td>Mitarbeiter_ID</td></tr></table>>];
+    "TEST" [shape=none, label=<<table border="1" cellborder="0" cellspacing="0"><tr><td bgcolor="#BBDEFB"><b>TEST</b></td></tr><tr><td><u>ID</u></td></tr></table>>];
+    "TESTFK" [shape=none, label=<<table border="1" cellborder="0" cellspacing="0"><tr><td bgcolor="#BBDEFB"><b>TESTFK</b></td></tr><tr><td>ID</td></tr></table>>];
+    "TEST_FOR_EDIT" [shape=none, label=<<table border="1" cellborder="0" cellspacing="0"><tr><td bgcolor="#BBDEFB"><b>TEST_FOR_EDIT</b></td></tr><tr><td><u>ID</u></td></tr></table>>];
+    "MITARBEITER_TEST" -> "TEAMS_TEST" [label="Mitarbeiter_ID", arrowhead=crow, arrowtail=none, dir=both];
+    "TEST" -> "TESTFK" [label="ID", arrowhead=crow, arrowtail=none, dir=both];
+}
