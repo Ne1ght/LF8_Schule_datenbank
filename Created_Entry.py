@@ -280,13 +280,18 @@ class Created_Entry():
 
             if is_fk:
                 fk_var = StringVar(value="-- Select --")
-                fk_values = self._fetch_fk_values(*self.fk_info[col_name])
-                if not fk_values:
-                    fk_values = ["(no data)"]
-                opt = OptionMenu(self.inner_frame, fk_var, *fk_values)
+                fk_pairs = self._fetch_fk_values(*self.fk_info[col_name])  # [(label, val), ...]
+
+                if not fk_pairs:
+                    fk_pairs = [("(no data)", "(no data)")]
+
+                fk_labels = [pair[0] for pair in fk_pairs]
+                fk_map = {pair[0]: pair[1] for pair in fk_pairs}  # label -> actual FK value
+
+                opt = OptionMenu(self.inner_frame, fk_var, *fk_labels)
                 opt.config(width=18)
                 opt.grid(row=grid_row, column=col_idx + 1, padx=1, pady=1, sticky="nsew")
-                row_widgets[col_name] = {"widget": opt, "var": fk_var, "kind": "fk"}
+                row_widgets[col_name] = {"widget": opt, "var": fk_var, "kind": "fk", "fk_map": fk_map}
             else:
                 entry = Entry(self.inner_frame, width=20)
                 entry.grid(row=grid_row, column=col_idx + 1, padx=1, pady=1, sticky="nsew")
@@ -352,14 +357,19 @@ class Created_Entry():
                 old_wd = old_row["widgets"][col_name]
 
                 if old_wd["kind"] == "fk":
-                    fk_var = StringVar(value=old_wd["var"].get())
-                    fk_values = self._fetch_fk_values(*self.fk_info[col_name])
-                    if not fk_values:
-                        fk_values = ["(no data)"]
-                    opt = OptionMenu(self.inner_frame, fk_var, *fk_values)
+                    fk_var = StringVar(value="-- Select --")
+                    fk_pairs = self._fetch_fk_values(*self.fk_info[col_name])  # [(label, val), ...]
+
+                    if not fk_pairs:
+                        fk_pairs = [("(no data)", "(no data)")]
+
+                    fk_labels = [pair[0] for pair in fk_pairs]
+                    fk_map = {pair[0]: pair[1] for pair in fk_pairs}  # label -> actual FK value
+
+                    opt = OptionMenu(self.inner_frame, fk_var, *fk_labels)
                     opt.config(width=18)
                     opt.grid(row=grid_row, column=col_idx + 1, padx=1, pady=1, sticky="nsew")
-                    new_widgets[col_name] = {"widget": opt, "var": fk_var, "kind": "fk"}
+                    new_widgets[col_name] = {"widget": opt, "var": fk_var, "kind": "fk", "fk_map": fk_map}
                 else:
                     old_value = old_wd["widget"].get()
                     entry = Entry(self.inner_frame, width=20)
@@ -388,8 +398,25 @@ class Created_Entry():
 
     def _fetch_fk_values(self, ref_table, ref_column):
         try:
-            cur.execute(f'SELECT "{ref_column}" FROM "{ref_table}" ORDER BY 1')
-            return [str(row[0]) for row in cur.fetchall()]
+            cur.execute(f'SELECT * FROM "{ref_table}" ORDER BY 1')
+            columns = [desc[0] for desc in cur.description]
+            rows = cur.fetchall()
+
+            result = []
+            for row in rows:
+                row_dict = dict(zip(columns, row))
+                fk_val = str(row_dict[ref_column])
+
+                # Alle anderen Spalten als Label anzeigen
+                other_parts = [
+                    f"{col}: {row_dict[col]}"
+                    for col in columns
+                    if col != ref_column
+                ]
+                label = f"[{fk_val}]  " + "  |  ".join(other_parts)
+                result.append((label, fk_val))
+
+            return result
         except Exception as e:
             print(f"Error fetching FK values from {ref_table}.{ref_column}: {e}")
             return []
@@ -411,12 +438,14 @@ class Created_Entry():
                 wd = row_data["widgets"][col_name]
 
                 if wd["kind"] == "fk":
-                    raw = wd["var"].get()
-                    if raw in ("-- Select --", "(no data)"):
+                    label = wd["var"].get()
+                    if label in ("-- Select --", "(no data)"):
                         self.status_label.config(
                             text=f"Row {row_data['row_num']}: '{col_name}' needs a value.",
                             fg="red")
                         return
+                    # Echten FK-Wert aus dem Mapping holen
+                    raw = wd["fk_map"].get(label, label)
                 else:
                     raw = wd["widget"].get().strip()
 

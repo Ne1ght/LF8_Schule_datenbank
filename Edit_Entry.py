@@ -438,7 +438,7 @@ class Edit_Entry():
                 "widgets": {},
                 "marked_for_delete": False,
                 "grid_row": None,
-                "column_names": columns.upper()  # Store column names for reference
+                "column_names": columns  # Store column names for reference
             })
 
         print(f"Loaded {len(self.existing_rows)} existing rows")

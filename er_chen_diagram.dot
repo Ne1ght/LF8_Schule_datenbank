@@ -1,11 +1,18 @@
 digraph ER {
     graph [rankdir=LR];
-    "DELETE_TEST" [shape=none, label=<<table border="1" cellborder="0" cellspacing="0"><tr><td bgcolor="#BBDEFB"><b>DELETE_TEST</b></td></tr><tr><td><u>ID</u></td></tr><tr><td>NAME_OF_ID</td></tr></table>>];
-    "MITARBEITER_TEST" [shape=none, label=<<table border="1" cellborder="0" cellspacing="0"><tr><td bgcolor="#BBDEFB"><b>MITARBEITER_TEST</b></td></tr><tr><td><u>MITARBEITER_ID</u></td></tr><tr><td>VORNAME</td></tr><tr><td>MITTELNAME</td></tr><tr><td>NACHNAME</td></tr><tr><td>ADRESSE</td></tr><tr><td>ORT</td></tr><tr><td>ABTEILUNG</td></tr><tr><td>JOBBEZEICHNUNG</td></tr><tr><td>TELEFONNUMMER</td></tr><tr><td>Anfangs Datum</td></tr></table>>];
-    "TEAMS_TEST" [shape=none, label=<<table border="1" cellborder="0" cellspacing="0"><tr><td bgcolor="#BBDEFB"><b>TEAMS_TEST</b></td></tr><tr><td>TEAMS_ID</td></tr><tr><td>TEAM_NAME</td></tr><tr><td>Mitarbeiter_ID</td></tr></table>>];
-    "TEST" [shape=none, label=<<table border="1" cellborder="0" cellspacing="0"><tr><td bgcolor="#BBDEFB"><b>TEST</b></td></tr><tr><td><u>ID</u></td></tr></table>>];
-    "TESTFK" [shape=none, label=<<table border="1" cellborder="0" cellspacing="0"><tr><td bgcolor="#BBDEFB"><b>TESTFK</b></td></tr><tr><td>ID</td></tr></table>>];
-    "TEST_FOR_EDIT" [shape=none, label=<<table border="1" cellborder="0" cellspacing="0"><tr><td bgcolor="#BBDEFB"><b>TEST_FOR_EDIT</b></td></tr><tr><td><u>ID</u></td></tr></table>>];
-    "MITARBEITER_TEST" -> "TEAMS_TEST" [label="Mitarbeiter_ID", arrowhead=crow, arrowtail=none, dir=both];
-    "TEST" -> "TESTFK" [label="ID", arrowhead=crow, arrowtail=none, dir=both];
+    "BILDUNGSGANG" [shape=none, label=<<table border="1" cellborder="0" cellspacing="0"><tr><td bgcolor="#BBDEFB"><b>BILDUNGSGANG</b></td></tr><tr><td><u>BILDUNGSGANG_ID</u></td></tr><tr><td>BEZEICHNUNG</td></tr></table>>];
+    "FACHRICHTUNG" [shape=none, label=<<table border="1" cellborder="0" cellspacing="0"><tr><td bgcolor="#BBDEFB"><b>FACHRICHTUNG</b></td></tr><tr><td><u>FACHRICHTUNG_ID</u></td></tr><tr><td>BEZEICHNUNG</td></tr></table>>];
+    "KLASSE" [shape=none, label=<<table border="1" cellborder="0" cellspacing="0"><tr><td bgcolor="#BBDEFB"><b>KLASSE</b></td></tr><tr><td><u>KLASSEN_ID</u></td></tr><tr><td>KLASSENNAME</td></tr><tr><td>bildungsgang_id</td></tr><tr><td>klassenlehrer_id</td></tr></table>>];
+    "KLASSE_FACH" [shape=none, label=<<table border="1" cellborder="0" cellspacing="0"><tr><td bgcolor="#BBDEFB"><b>KLASSE_FACH</b></td></tr><tr><td>KLASSEN_ID</td></tr><tr><td>FACH_ID</td></tr><tr><td>LEHRER_ID</td></tr></table>>];
+    "LEHRER" [shape=none, label=<<table border="1" cellborder="0" cellspacing="0"><tr><td bgcolor="#BBDEFB"><b>LEHRER</b></td></tr><tr><td><u>LEHRER_ID</u></td></tr><tr><td>VORNAME</td></tr><tr><td>NACHNAME</td></tr><tr><td>ERSTFACH_ID</td></tr><tr><td>ZWEITFACH_ID</td></tr></table>>];
+    "SCHUELER" [shape=none, label=<<table border="1" cellborder="0" cellspacing="0"><tr><td bgcolor="#BBDEFB"><b>SCHUELER</b></td></tr><tr><td><u>SCHUELER_ID</u></td></tr><tr><td>VORNAME</td></tr><tr><td>NACHNAME</td></tr><tr><td>KLASSEN_ID</td></tr></table>>];
+    "UNTERRICHTSFACH" [shape=none, label=<<table border="1" cellborder="0" cellspacing="0"><tr><td bgcolor="#BBDEFB"><b>UNTERRICHTSFACH</b></td></tr><tr><td><u>FACH_ID</u></td></tr><tr><td>BEZEICHNUNG</td></tr><tr><td>FACHRICHTUNG_ID</td></tr></table>>];
+    "BILDUNGSGANG" -> "KLASSE" [label="bildungsgang_id", arrowhead=crow, arrowtail=none, dir=both];
+    "LEHRER" -> "KLASSE" [label="klassenlehrer_id", arrowhead=crow, arrowtail=none, dir=both];
+    "KLASSE" -> "KLASSE_FACH" [label="KLASSEN_ID", arrowhead=crow, arrowtail=none, dir=both];
+    "FACHRICHTUNG" -> "KLASSE_FACH" [label="FACH_ID", arrowhead=crow, arrowtail=none, dir=both];
+    "LEHRER" -> "KLASSE_FACH" [label="LEHRER_ID", arrowhead=crow, arrowtail=none, dir=both];
+    "FACHRICHTUNG" -> "LEHRER" [label="ERSTFACH_ID", arrowhead=crow, arrowtail=none, dir=both];
+    "KLASSE" -> "SCHUELER" [label="KLASSEN_ID", arrowhead=crow, arrowtail=none, dir=both];
+    "FACHRICHTUNG" -> "UNTERRICHTSFACH" [label="FACHRICHTUNG_ID", arrowhead=crow, arrowtail=none, dir=both];
 }
